@@ -98,44 +98,6 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Version
-//
-
-VS_VERSION_INFO VERSIONINFO
- FILEVERSION 30,0,1,0
-BEGIN
-    BLOCK "StringFileInfo"
-    BEGIN
-	BLOCK "040904B0"
-	BEGIN
-	    VALUE "CompanyName", "Intel Corporation"
-	    VALUE "FileDescription", "OBS Video Capture module"
-	    VALUE "FileVersion", "${OBS_VERSION_CANONICAL}"
-	    VALUE "ProductName", "${OBS_PRODUCT_NAME}"
-	    VALUE "ProductVersion", "${OBS_VERSION_CANONICAL}"
-	    VALUE "LegalCopyright", "Copyright (C) 2023, Intel Corporation"
-	    VALUE "InternalName", "win-mf"
-	    VALUE "OriginalFilename", "win-mf"
-	END
-    END
-    BLOCK "VarFileInfo"
-    BEGIN
-	VALUE "Translation", 0x409,1200
-    END
-END
-
+// Version info provided by obs-module.rc to avoid duplicate VERSION resources
 #endif    // English (United States) resources
-/////////////////////////////////////////////////////////////////////////////
-
-
-
-#ifndef APSTUDIO_INVOKED
-/////////////////////////////////////////////////////////////////////////////
-//
-// Generated from the TEXTINCLUDE 3 resource.
-//
-
-
-/////////////////////////////////////////////////////////////////////////////
-#endif    // not APSTUDIO_INVOKED
 

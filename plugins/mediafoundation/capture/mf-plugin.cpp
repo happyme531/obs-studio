@@ -48,6 +48,8 @@ SOFTWARE
 #include <strsafe.h>
 #include <strmif.h>
 
+#define PLUGIN_NAME "win-mf-capture"
+
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
@@ -61,5 +63,5 @@ bool obs_module_load(void)
 
 void obs_module_unload()
 {
-	blog(LOG_INFO, "win-mf plugin unloaded");
+	blog(LOG_INFO, PLUGIN_NAME " plugin unloaded");
 }

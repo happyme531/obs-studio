@@ -12,8 +12,8 @@ BEGIN
       VALUE "ProductVersion", "${OBS_VERSION_CANONICAL}"
       VALUE "Comments", "${OBS_COMMENTS}"
       VALUE "LegalCopyright", "Copyright (C) 2023, Intel Corporation"
-      VALUE "InternalName", "win-mf"
-      VALUE "OriginalFilename", "win-mf"
+      VALUE "InternalName", "win-mf-capture"
+      VALUE "OriginalFilename", "win-mf-capture"
     END
   END
 
