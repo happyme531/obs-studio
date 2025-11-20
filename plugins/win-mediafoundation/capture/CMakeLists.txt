@@ -24,11 +24,9 @@ target_sources(
     libmfcapture/source/VideoBufferLock.cpp
 )
 
-configure_file(cmake/windows/obs-module.rc.in win-mf.rc)
-configure_file(libmfcapture/source/mfcapture.rc.in win-mf.rc)
-target_sources(win-mediafoundation-capture PRIVATE win-mf.rc)
-
-target_precompile_headers(win-mediafoundation-capture PRIVATE <wil/cppwinrt.h> <wil/result.h> <wil/com.h>)
+configure_file(cmake/windows/obs-module.rc.in win-mf-capture-module.rc)
+configure_file(libmfcapture/source/mfcapture.rc.in win-mf-capture-res.rc)
+target_sources(win-mediafoundation-capture PRIVATE win-mf-capture-module.rc win-mf-capture-res.rc)
 
 target_link_libraries(
   win-mediafoundation-capture
@@ -44,5 +42,7 @@ target_link_libraries(
     dxguid
     libmfcapture
 )
+
+target_precompile_headers(win-mediafoundation-capture PRIVATE <wil/cppwinrt.h> <wil/result.h> <wil/com.h>)
 
 set_target_properties_obs(win-mediafoundation-capture PROPERTIES FOLDER plugins/win-mediafoundation/capture PREFIX "")
