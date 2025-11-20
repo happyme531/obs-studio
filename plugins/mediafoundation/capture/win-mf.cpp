@@ -743,34 +743,35 @@ DEFINE_GUID(OBS_DXCORE_HARDWARE_TYPE_ATTRIBUTE_NPU, 0xd46140c4, 0xadd7, 0x451b, 
 
 bool NPUDetection()
 {
-	// You begin DXCore adapter enumeration by creating an adapter factory.
-	winrt::com_ptr<IDXCoreAdapterFactory> adapterFactory;
-	winrt::check_hresult(::DXCoreCreateAdapterFactory(adapterFactory.put()));
+	// // You begin DXCore adapter enumeration by creating an adapter factory.
+	// winrt::com_ptr<IDXCoreAdapterFactory> adapterFactory;
+	// winrt::check_hresult(::DXCoreCreateAdapterFactory(adapterFactory.put()));
 
-	// From the factory, retrieve a list of all the Direct3D 12 Core Compute adapters.
-	winrt::com_ptr<IDXCoreAdapterList> d3D12CoreComputeAdapters;
-	GUID attributes[]{OBS_DXCORE_HARDWARE_TYPE_ATTRIBUTE_NPU};
-	winrt::check_hresult(
-		adapterFactory->CreateAdapterList(_countof(attributes), attributes, d3D12CoreComputeAdapters.put()));
+	// // From the factory, retrieve a list of all the Direct3D 12 Core Compute adapters.
+	// winrt::com_ptr<IDXCoreAdapterList> d3D12CoreComputeAdapters;
+	// GUID attributes[]{OBS_DXCORE_HARDWARE_TYPE_ATTRIBUTE_NPU};
+	// winrt::check_hresult(
+	// 	adapterFactory->CreateAdapterList(_countof(attributes), attributes, d3D12CoreComputeAdapters.put()));
 
-	const uint32_t count{d3D12CoreComputeAdapters->GetAdapterCount()};
+	// const uint32_t count{d3D12CoreComputeAdapters->GetAdapterCount()};
 
-	bool npuDetected = false;
+	// bool npuDetected = false;
 
-	for (uint32_t i = 0; i < count; ++i) {
-		winrt::com_ptr<IDXCoreAdapter> candidateAdapter;
-		winrt::check_hresult(d3D12CoreComputeAdapters->GetAdapter(i, candidateAdapter.put()));
+	// for (uint32_t i = 0; i < count; ++i) {
+	// 	winrt::com_ptr<IDXCoreAdapter> candidateAdapter;
+	// 	winrt::check_hresult(d3D12CoreComputeAdapters->GetAdapter(i, candidateAdapter.put()));
 
-		char description[256];
-		winrt::check_hresult(
-			candidateAdapter->GetProperty(DXCoreAdapterProperty::DriverDescription, &description));
+	// 	char description[256];
+	// 	winrt::check_hresult(
+	// 		candidateAdapter->GetProperty(DXCoreAdapterProperty::DriverDescription, &description));
 
-		char npu[256] = "Intel(R) AI Boost";
-		if (strcmp(description, npu) == 0)
-			npuDetected = true;
-	}
+	// 	char npu[256] = "Intel(R) AI Boost";
+	// 	if (strcmp(description, npu) == 0)
+	// 		npuDetected = true;
+	// }
 
-	return npuDetected;
+	// return npuDetected;
+	return true; 
 }
 
 static obs_properties_t *GetMediaFoundationSourceProperties(void *obj)
