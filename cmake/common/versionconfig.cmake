@@ -2,6 +2,9 @@
 
 include_guard(GLOBAL)
 
+
+set(OBS_VERSION_OVERRIDE "32.1.0-hallo1armhack")
+
 set(_obs_version ${_obs_default_version})
 set(_obs_version_canonical ${_obs_default_version})
 
