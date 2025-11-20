@@ -1,6 +1,7 @@
 name: Build Project
 on:
   workflow_call:
+  workflow_dispatch:
 jobs:
   check-event:
     name: Event Data 🔎
@@ -43,7 +44,7 @@ jobs:
               fi
               ;;
             workflow_dispatch)
-              config_data=('codesign:true' 'notarize:false' 'package:false' 'config:RelWithDebInfo')
+              config_data=('codesign:false' 'notarize:false' 'package:true' 'config:RelWithDebInfo')
               ;;
             schedule)
               config_data=('codesign:true' 'notarize:false' 'package:true' 'config:RelWithDebInfo')
