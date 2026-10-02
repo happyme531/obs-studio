@@ -2,6 +2,14 @@ name: Build Project
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Build target
+        type: choice
+        default: all
+        options:
+          - all
+          - windows-arm64
 jobs:
   check-event:
     name: Event Data 🔎
@@ -59,6 +67,7 @@ jobs:
           echo "commitHash=${GITHUB_SHA:0:9}" >> $GITHUB_OUTPUT
 
   macos-build:
+    if: inputs.target != 'windows-arm64'
     name: macOS 🍏
     runs-on: macos-26
     needs: check-event
@@ -179,6 +188,7 @@ jobs:
           key: ${{ runner.os }}-xcode-${{ matrix.target }}-${{ needs.check-event.outputs.config }}
 
   ubuntu-build:
+    if: inputs.target != 'windows-arm64'
     name: Ubuntu 🐧
     strategy:
       fail-fast: false
@@ -254,6 +264,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.os }}-ccache-x86_64-${{ needs.check-event.outputs.config }}
 
   flatpak-build:
+    if: inputs.target != 'windows-arm64'
     name: Flatpak 📦
     runs-on: ubuntu-26.04
     needs: check-event
@@ -385,7 +396,7 @@ jobs:
     name: Windows 🪟
     strategy:
       matrix:
-        architecture: [x64, arm64]
+        architecture: ${{ fromJSON(inputs.target == 'windows-arm64' && '["arm64"]' || '["x64", "arm64"]') }}
     runs-on: windows-2025-vs2026
     needs: check-event
     defaults:
