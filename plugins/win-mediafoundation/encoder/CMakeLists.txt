@@ -11,6 +11,8 @@ target_sources(
     mf-av1.cpp
     mf-common.cpp
     mf-common.hpp
+    mf-encoder.cpp
+    mf-encoder.hpp
     mf-encoder-descriptor.cpp
     mf-encoder-descriptor.hpp
     mf-h264-encoder.cpp

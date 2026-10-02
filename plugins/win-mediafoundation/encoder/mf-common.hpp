@@ -2,19 +2,19 @@
 
 #include <obs-module.h>
 
-#include <mfapi.h>
-#include <functional>
-#include <comdef.h>
 #include <chrono>
+#include <comdef.h>
 #include <d3d11.h>
+#include <functional>
+#include <mfapi.h>
 #include <wrl/client.h>
 
-#pragma comment(lib, "dxguid.lib")
-#pragma comment(lib, "wbemuuid.lib")
-#pragma comment(lib, "setupapi.lib")
 #pragma comment(lib, "D3D11.lib")
+#pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "mfplat.lib")
 #pragma comment(lib, "mfuuid.lib")
+#pragma comment(lib, "setupapi.lib")
+#pragma comment(lib, "wbemuuid.lib")
 #pragma comment(lib, "Winmm.lib")
 
 #ifndef CHECK_HR_ERROR

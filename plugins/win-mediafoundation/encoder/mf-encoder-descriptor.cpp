@@ -1,10 +1,12 @@
+#include "mf-encoder-descriptor.hpp"
+
 #include <obs-module.h>
 #include <util/platform.h>
-#include <memory>
-#include <algorithm>
-#include <string>
 
-#include "mf-encoder-descriptor.hpp"
+#include <array>
+#include <algorithm>
+#include <memory>
+#include <string>
 
 template<class T> class ComHeapPtr {
 
@@ -22,8 +24,10 @@ protected:
 	inline void Replace(T *p)
 	{
 		if (ptr != p) {
-			if (ptr)
+			if (ptr) {
 				ptr->Kill();
+			}
+
 			ptr = p;
 		}
 	}
@@ -81,13 +85,13 @@ public:
 };
 
 struct EncoderEntry {
-	const char *guid;
-	const char *name;
-	const char *id;
+	std::string_view guid;
+	std::string_view name;
+	std::string_view id;
 	MF::EncoderType type;
 };
 
-constexpr EncoderEntry guidNameMap[] = {
+constexpr std::array<EncoderEntry, 7> guidNameMap{{
 	{"{6CA50344-051A-4DED-9779-A43305165E35}", "MF.H264.EncoderSWMicrosoft", "mf_h264_software",
 	 MF::EncoderType::H264_SOFTWARE},
 	{"{ADC9BC80-0F41-46C6-AB75-D693D793597D}", "MF.H264.EncoderHWAMD", "mf_h264_vce", MF::EncoderType::H264_VCE},
@@ -99,23 +103,24 @@ constexpr EncoderEntry guidNameMap[] = {
 	{"{5AAFFE75-4EA4-424C-89E3-4A1E3F9A570D}", "MF.HEVC.EncoderHWQCOM", "qcom_hevc_tex",
 	 MF::EncoderType::HEVC_QCOM},
 	{"{0705AB91-0EC9-4D51-90E2-00C3360F41C4}", "MF.AV1.EncoderHWQCOM", "qcom_av1_tex", MF::EncoderType ::AV1_QCOM},
-};
+}};
 
 namespace {
 std::string MBSToString(wchar_t *mbs)
 {
-	char *cstr;
-	os_wcs_to_utf8_ptr(mbs, 0, &cstr);
-	std::string str = cstr;
-	bfree(cstr);
-	return str;
+	std::unique_ptr<char, decltype(&bfree)> cstr{nullptr, bfree};
+	char *raw = nullptr;
+	os_wcs_to_utf8_ptr(mbs, 0, &raw);
+	cstr.reset(raw);
+	return cstr ? std::string{cstr.get()} : std::string{};
 }
 
 std::unique_ptr<MF::EncoderDescriptor> CreateDescriptor(ComPtr<IMFActivate> activate)
 {
 	UINT32 flags;
-	if (FAILED(activate->GetUINT32(MF_TRANSFORM_FLAGS_Attribute, &flags)))
+	if (FAILED(activate->GetUINT32(MF_TRANSFORM_FLAGS_Attribute, &flags))) {
 		return nullptr;
+	}
 
 	bool isAsync = !(flags & MFT_ENUM_FLAG_SYNCMFT);
 	isAsync |= !!(flags & MFT_ENUM_FLAG_ASYNCMFT);
@@ -123,8 +128,9 @@ std::unique_ptr<MF::EncoderDescriptor> CreateDescriptor(ComPtr<IMFActivate> acti
 
 	GUID guid = {0};
 
-	if (FAILED(activate->GetGUID(MFT_TRANSFORM_CLSID_Attribute, &guid)))
+	if (FAILED(activate->GetGUID(MFT_TRANSFORM_CLSID_Attribute, &guid))) {
 		return nullptr;
+	}
 
 	ComHeapPtr<WCHAR> guidW;
 	StringFromIID(guid, &guidW);
@@ -134,7 +140,8 @@ std::unique_ptr<MF::EncoderDescriptor> CreateDescriptor(ComPtr<IMFActivate> acti
 		return guidString == name.guid;
 	};
 
-	const EncoderEntry *entry = std::find_if(std::begin(guidNameMap), std::end(guidNameMap), pred);
+	auto it = std::find_if(std::begin(guidNameMap), std::end(guidNameMap), pred);
+	const EncoderEntry *entry = (it != std::end(guidNameMap)) ? &(*it) : nullptr;
 
 	auto descriptor = std::make_unique<MF::EncoderDescriptor>(activate, entry->name, entry->id, guid, guidString,
 								  isAsync, isHardware, entry->type);
@@ -155,13 +162,9 @@ std::vector<std::shared_ptr<MF::EncoderDescriptor>> MF::EncoderDescriptor::Enume
 
 	if (std::strcmp(Codec, "h264") == 0) {
 		info.guidSubtype = MFVideoFormat_H264;
-	}
-
-	else if (std::strcmp(Codec, "hevc") == 0) {
+	} else if (std::strcmp(Codec, "hevc") == 0) {
 		info.guidSubtype = MFVideoFormat_HEVC;
-	}
-
-	else if (std::strcmp(Codec, "av1") == 0) {
+	} else if (std::strcmp(Codec, "av1") == 0) {
 		info.guidSubtype = MFVideoFormat_AV1;
 	}
 
@@ -185,8 +188,9 @@ std::vector<std::shared_ptr<MF::EncoderDescriptor>> MF::EncoderDescriptor::Enume
 	if (SUCCEEDED(hr)) {
 		for (decltype(count) i = 0; i < count; ++i) {
 			auto p = std::move(CreateDescriptor(ppActivate[i]));
-			if (p)
+			if (p) {
 				descriptors.emplace_back(std::move(p));
+			}
 		}
 	}
 

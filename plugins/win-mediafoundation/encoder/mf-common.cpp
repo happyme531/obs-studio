@@ -1,12 +1,12 @@
 #include "mf-common.hpp"
 
-#include <util/platform.h>
-#include <unordered_map>
 #include <mfapi.h>
 #include <Mferror.h>
 #include <strsafe.h>
+#include <memory>
+#include <unordered_map>
+#include <util/platform.h>
 #include <wrl/client.h>
-
 #include <string>
 
 using namespace std;
@@ -27,13 +27,16 @@ void DBGMSG(PCWSTR format, ...)
 	va_list args;
 	va_start(args, format);
 
-	WCHAR msg[MAX_PATH];
+	WCHAR msg[512];
 
 	if (SUCCEEDED(StringCbVPrintf(msg, sizeof(msg), format, args))) {
-		char *cmsg;
-		os_wcs_to_utf8_ptr(msg, 0, &cmsg);
-		MF::MF_LOG(LOG_INFO, "%s", cmsg);
-		bfree(cmsg);
+		std::unique_ptr<char, decltype(&bfree)> cmsg{nullptr, bfree};
+		char *raw = nullptr;
+		os_wcs_to_utf8_ptr(msg, 0, &raw);
+		cmsg.reset(raw);
+		if (cmsg) {
+			MF::MF_LOG(LOG_INFO, "%s", cmsg.get());
+		}
 	}
 }
 
@@ -431,12 +434,15 @@ void MF::Copy_Tex(void *tex, uint64_t lock_key, uint64_t *next_key, ID3D11Device
 	IDXGIKeyedMutex *km;
 	ID3D11Texture2D *input_tex = NULL;
 
-	hr = d3D11Device->OpenSharedResource((HANDLE)(uintptr_t)ptex->handle, IID_ID3D11Texture2D, (void **)&input_tex);
+	HANDLE textureHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(ptex->handle));
+	hr = d3D11Device->OpenSharedResource(textureHandle, IID_ID3D11Texture2D, reinterpret_cast<void **>(&input_tex));
 
-	if (FAILED(hr))
+	if (FAILED(hr)) {
 		blog(LOG_INFO, "Failed to OpenSharedResource");
+	}
 
-	hr = input_tex->QueryInterface(IID_IDXGIKeyedMutex, (void **)&km);
+	hr = input_tex->QueryInterface(IID_IDXGIKeyedMutex, reinterpret_cast<void **>(&km));
+
 	if (FAILED(hr)) {
 		input_tex->Release();
 		blog(LOG_INFO, "Failed to Query interface");
@@ -448,8 +454,9 @@ void MF::Copy_Tex(void *tex, uint64_t lock_key, uint64_t *next_key, ID3D11Device
 
 	input_tex->GetDesc(&desc);
 	SrcBox = {0, 0, 0, desc.Width, desc.Height, 1};
-	if (input_tex != NULL)
+	if (input_tex != NULL) {
 		d3D11Ctx->CopySubresourceRegion(surface, 0, 0, 0, 0, input_tex, 0, &SrcBox);
+	}
 
 	km->ReleaseSync(*next_key);
 
@@ -461,8 +468,9 @@ HRESULT MF::CreateD3D11EncoderResources(const video_output_info *voi, ID3D11Devi
 					ID3D11DeviceContext **context, ComPtr_Dev<IMFDXGIDeviceManager> &deviceManager,
 					ID3D11Texture2D **surface)
 {
-	if (!voi || !device || !context || !surface)
+	if (!voi || !device || !context || !surface) {
 		return E_INVALIDARG;
+	}
 
 	HRESULT hr = S_OK;
 	UINT resetToken = 0;
@@ -502,8 +510,9 @@ HRESULT MF::CreateD3D11EncoderResources(const video_output_info *voi, ID3D11Devi
 		blog(LOG_ERROR, "Failed to create DXGIDeviceManager hr=0x%08x", (unsigned)hr);
 		return hr;
 	}
-	if (device != NULL)
+	if (device != NULL) {
 		hr = deviceManager->ResetDevice(*device, resetToken);
+	}
 
 	if (FAILED(hr)) {
 		blog(LOG_ERROR, "Failed to assign D3D device to device manager hr=0x%08x", (unsigned)hr);
@@ -536,8 +545,10 @@ HRESULT MF::CreateD3D11EncoderResources(const video_output_info *voi, ID3D11Devi
 
 double MF::ComputeBppf(double bitrate_bps, uint32_t width, uint32_t height, double fps)
 {
-	if (bitrate_bps <= 0 || width <= 0 || height <= 0 || fps <= 0.0)
+	if (bitrate_bps <= 0 || width <= 0 || height <= 0 || fps <= 0.0) {
 		return 0.0;
+	}
+
 	return bitrate_bps / (static_cast<double>(width) * height * fps);
 }
 
@@ -596,8 +607,10 @@ void MF::QpRange(Codec Codec, double bppf, uint32_t *minQp, uint32_t *maxQp)
 	uint32_t min_qp = std::max(qp_min_limit, base_qp - 6);
 	uint32_t max_qp = std::min(qp_max_limit, base_qp + 10);
 
-	if (min_qp > max_qp)
+	if (min_qp > max_qp) {
 		std::swap(min_qp, max_qp);
+	}
+
 	*minQp = min_qp;
 	*maxQp = max_qp;
 }

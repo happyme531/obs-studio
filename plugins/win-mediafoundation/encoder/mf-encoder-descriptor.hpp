@@ -1,13 +1,17 @@
 #pragma once
 
-#define WIN32_MEAN_AND_LEAN
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <Windows.h>
-#undef WIN32_MEAN_AND_LEAN
+#undef WIN32_LEAN_AND_MEAN
 
+#include <memory>
 #include <mfapi.h>
 #include <mfidl.h>
-
 #include <stdint.h>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include <util/windows/ComPtr.hpp>
@@ -22,7 +26,7 @@ public:
 	static std::vector<std::shared_ptr<EncoderDescriptor>> Enumerate(const char[]);
 
 public:
-	EncoderDescriptor(ComPtr<IMFActivate> activate_, const char *name_, const char *id_, GUID &guid_,
+	EncoderDescriptor(ComPtr<IMFActivate> activate_, std::string_view name_, std::string_view id_, GUID &guid_,
 			  const std::string &guidString_, bool isAsync_, bool isHardware_, EncoderType type_)
 		: activate(activate_),
 		  name(name_),
@@ -38,8 +42,8 @@ public:
 	EncoderDescriptor(const EncoderDescriptor &) = delete;
 
 public:
-	const char *Name() const { return name; }
-	const char *Id() const { return id; }
+	const char *Name() const { return name.c_str(); }
+	const char *Id() const { return id.c_str(); }
 	ComPtr<IMFActivate> &Activator() { return activate; }
 	GUID &Guid() { return guid; }
 	std::string GuidString() const { return guidString; }
@@ -49,8 +53,8 @@ public:
 
 private:
 	ComPtr<IMFActivate> activate;
-	const char *name;
-	const char *id;
+	std::string name;
+	std::string id;
 	GUID guid;
 	std::string guidString;
 	bool isAsync;
