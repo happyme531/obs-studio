@@ -30,3 +30,5 @@ target_link_libraries(
 )
 
 set_target_properties_obs(win-mediafoundation-encoder PROPERTIES FOLDER "plugins" PREFIX "")
+
+target_enable(win-mediafoundation-encoder)

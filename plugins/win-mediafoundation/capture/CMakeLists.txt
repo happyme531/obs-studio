@@ -48,3 +48,5 @@ target_compile_definitions(win-mediafoundation-capture PRIVATE _SILENCE_EXPERIME
 target_precompile_headers(win-mediafoundation-capture PRIVATE <wil/cppwinrt.h> <wil/result.h> <wil/com.h>)
 
 set_target_properties_obs(win-mediafoundation-capture PROPERTIES FOLDER plugins/win-mediafoundation/capture PREFIX "")
+
+target_enable(win-mediafoundation-capture)
