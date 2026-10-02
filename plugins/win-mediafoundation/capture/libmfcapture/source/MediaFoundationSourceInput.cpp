@@ -1,6 +1,6 @@
 /*
 
-This is provided under a dual MIT/GPLv2 license.  When using or
+This is provided under a dual MIT/GPLv2+ license.  When using or
 redistributing this, you may do so under either license.
 
 GPL LICENSE SUMMARY
@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -45,7 +46,59 @@ SOFTWARE
 */
 
 #include "DeviceEnumerator.h"
-#include "MediaFoundationSourceInput.h"
+#include "MediaFoundationSourceInput.hpp"
+
+#include <cinttypes>
+
+DWORD CALLBACK MediaFoundationSourceThread(LPVOID ptr)
+{
+	MediaFoundationSourceInput *input = (MediaFoundationSourceInput *)ptr;
+	os_set_thread_name("win-mediafoundation: MediaFoundationSourceThread");
+	if (SUCCEEDED(CoInitialize(nullptr))) {
+		if (SUCCEEDED(MFStartup(MF_VERSION))) {
+			input->MediaFoundationSourceLoop();
+			MFShutdown();
+		}
+		CoUninitialize();
+	}
+	return 0;
+}
+
+MediaFoundationSourceInput::MediaFoundationSourceInput(obs_source_t *source_, obs_data_t *settings) : source(source_)
+{
+	memset(&frame, 0, sizeof(frame));
+
+	semaphore = CreateSemaphore(nullptr, 0, 0x7FFFFFFF, nullptr);
+	if (!semaphore) {
+		throw "Failed to create semaphore";
+	}
+
+	activated_event = CreateEvent(nullptr, false, false, nullptr);
+	if (!activated_event) {
+		throw "Failed to create activated_event";
+	}
+
+	saved_event = CreateEvent(nullptr, false, false, nullptr);
+	if (!saved_event) {
+		throw "Failed to create saved_event";
+	}
+
+	thread = CreateThread(nullptr, 0, MediaFoundationSourceThread, this, 0, nullptr);
+	if (!thread) {
+		throw "Failed to create thread";
+	}
+
+	deactivateWhenNotShowing = obs_data_get_bool(settings, MFCaptureConstants::DEACTIVATE_WNS);
+
+	if (obs_data_get_bool(settings, "active")) {
+		bool showing = obs_source_showing(source);
+		if (!deactivateWhenNotShowing || showing) {
+			QueueActivate(settings);
+		}
+
+		active = true;
+	}
+}
 
 void MediaFoundationSourceInput::MediaFoundationSourceLoop()
 {
@@ -77,8 +130,9 @@ void MediaFoundationSourceInput::MediaFoundationSourceLoop()
 			if (!Activate(settings)) {
 				obs_source_output_video2(source, nullptr);
 			}
-			if (block)
+			if (block) {
 				SetEvent(activated_event);
+			}
 			obs_data_release(settings);
 			break;
 		}
@@ -125,30 +179,31 @@ void MediaFoundationSourceInput::OnVideoData(void *pData, int Size, long long ll
 	const int cx = videoConfig.cx;
 	const int cyAbs = videoConfig.cyAbs;
 
-	frame.timestamp = (uint64_t)llTimestamp * 100;
+	frame.timestamp = static_cast<uint64_t>(llTimestamp * 100);
 	frame.width = videoConfig.cx;
 	frame.height = cyAbs;
 	frame.format = VIDEO_FORMAT_BGRA;
 	frame.flip = flip;
 	frame.flags = OBS_SOURCE_FRAME_LINEAR_ALPHA;
 
-	frame.data[0] = (unsigned char *)pData;
+	frame.data[0] = static_cast<unsigned char *>(pData);
 	frame.linesize[0] = cx * 4;
 
 	obs_source_output_video2(source, &frame);
 }
 
-inline void MediaFoundationSourceInput::SetupBuffering(obs_data_t *settings)
+void MediaFoundationSourceInput::SetupBuffering(obs_data_t *settings)
 {
 	BufferingType bufType;
 	bool useBuffering;
 
-	bufType = (BufferingType)obs_data_get_int(settings, BUFFERING_VAL);
+	bufType = static_cast<BufferingType>(obs_data_get_int(settings, MFCaptureConstants::BUFFERING_VAL));
 
-	if (bufType == BufferingType::Auto)
+	if (bufType == BufferingType::Auto) {
 		useBuffering = false;
-	else
+	} else {
 		useBuffering = bufType == BufferingType::On;
+	}
 
 	obs_source_set_async_unbuffered(source, !useBuffering);
 	obs_source_set_async_decoupled(source, IsDecoupled(videoConfig));
@@ -156,7 +211,7 @@ inline void MediaFoundationSourceInput::SetupBuffering(obs_data_t *settings)
 
 void MediaFoundationSourceInput::OnVideoDataStatic(void *pData, int Size, long long llTimestamp, void *pUserData)
 {
-	MediaFoundationSourceInput *pThis = (MediaFoundationSourceInput *)pUserData;
+	MediaFoundationSourceInput *pThis = static_cast<MediaFoundationSourceInput *>(pUserData);
 
 	if (pThis) {
 		pThis->OnVideoData(pData, Size, llTimestamp);
@@ -165,10 +220,11 @@ void MediaFoundationSourceInput::OnVideoDataStatic(void *pData, int Size, long l
 
 bool MediaFoundationSourceInput::UpdateVideoConfig(obs_data_t *settings)
 {
-	std::string video_device_id = obs_data_get_string(settings, VIDEO_DEVICE_ID);
-	deactivateWhenNotShowing = obs_data_get_bool(settings, DEACTIVATE_WNS);
-	flip = obs_data_get_bool(settings, FLIP_IMAGE);
-	autorotation = obs_data_get_bool(settings, AUTOROTATION);
+	std::string video_device_id = obs_data_get_string(settings, MFCaptureConstants::VIDEO_DEVICE_ID);
+	deactivateWhenNotShowing = obs_data_get_bool(settings, MFCaptureConstants::DEACTIVATE_WNS);
+	flip = obs_data_get_bool(settings, MFCaptureConstants::FLIP_IMAGE);
+	autorotation = obs_data_get_bool(settings, MFCaptureConstants::AUTOROTATION);
+	hw_decode = obs_data_get_bool(settings, MFCaptureConstants::HW_DECODE);
 
 	MediaFoundationDeviceId id;
 	if (!DecodeDeviceId(id, video_device_id.c_str())) {
@@ -186,39 +242,41 @@ bool MediaFoundationSourceInput::UpdateVideoConfig(obs_data_t *settings)
 		return false;
 	}
 
-	int resType = (int)obs_data_get_int(settings, RES_TYPE);
-	int cx = 0, cy = 0;
+	int resType = static_cast<int>(obs_data_get_int(settings, MFCaptureConstants::RES_TYPE));
+	FrameSize size = {0};
 	long long interval = 0;
 
 	if (resType == ResTypeCustom) {
 		bool has_autosel_val;
-		std::string resolution = obs_data_get_string(settings, RESOLUTION);
-		if (!ResolutionValid(resolution, cx, cy)) {
+		std::string resolution = obs_data_get_string(settings, MFCaptureConstants::RESOLUTION);
+		if (!ResolutionValid(resolution, size)) {
 			blog(LOG_WARNING, "%s: ResolutionValid failed", obs_source_get_name(source));
 			return false;
 		}
 
 		PRAGMA_WARN_PUSH
 		PRAGMA_WARN_DEPRECATION
-		has_autosel_val = obs_data_has_autoselect_value(settings, FRAME_INTERVAL);
-		interval = has_autosel_val ? obs_data_get_autoselect_int(settings, FRAME_INTERVAL)
-					   : obs_data_get_int(settings, FRAME_INTERVAL);
+		has_autosel_val = obs_data_has_autoselect_value(settings, MFCaptureConstants::FRAME_INTERVAL);
+		interval = has_autosel_val ? obs_data_get_autoselect_int(settings, MFCaptureConstants::FRAME_INTERVAL)
+					   : obs_data_get_int(settings, MFCaptureConstants::FRAME_INTERVAL);
 		PRAGMA_WARN_POP
 
-		if (interval == FPS_MATCHING)
+		if (interval == FPS_MATCHING) {
 			interval = GetOBSFPS();
+		}
 
 		long long best_interval = std::numeric_limits<long long>::max();
-		CapsMatch(dev, ResolutionMatcher(cx, cy), ClosestFrameRateSelector(interval, best_interval),
-			  FrameRateMatcher(interval));
+		bool caps_match = CapsMatch(dev, ResolutionMatcher(size),
+					    ClosestFrameRateSelector(interval, best_interval),
+					    FrameRateMatcher(interval));
 		interval = best_interval;
 	}
 
 	videoConfig.name = id.name;
 	videoConfig.path = id.path;
-	videoConfig.cx = cx;
-	videoConfig.cyAbs = abs(cy);
-	videoConfig.cyFlip = cy < 0;
+	videoConfig.cx = size.width;
+	videoConfig.cyAbs = abs(size.height);
+	videoConfig.cyFlip = size.height < 0;
 	videoConfig.frameInterval = interval;
 
 	mfcaptureDevice = MF_Create(dev.path.c_str());
@@ -243,14 +301,46 @@ bool MediaFoundationSourceInput::UpdateVideoConfig(obs_data_t *settings)
 			videoConfig.cx = w;
 			videoConfig.cyAbs = h;
 			videoConfig.frameInterval = interval;
+		} else {
+			blog(LOG_ERROR, "%s: Frame width or height are zero (%" PRIu32 "x%" PRIu32 ")",
+			     obs_source_get_name(source), videoConfig.cx, videoConfig.cyAbs);
+			return false;
 		}
 		if (SUCCEEDED(hr)) {
 			firstframe = true;
 			hr = MF_Start(mfcaptureDevice, OnVideoDataStatic, this);
+		} else {
+			blog(LOG_WARNING, "%s: device.SetVideoConfig failed", obs_source_get_name(source));
+			return false;
 		}
 	}
 
+	double fps = 0.0;
+
+	if (videoConfig.frameInterval) {
+		fps = 10000000.0 / double(videoConfig.frameInterval);
+	}
+
+	BPtr<char> name_utf8;
+	BPtr<char> path_utf8;
+	os_wcs_to_utf8_ptr(videoConfig.name.c_str(), videoConfig.name.size(), &name_utf8);
+	os_wcs_to_utf8_ptr(videoConfig.path.c_str(), videoConfig.path.size(), &path_utf8);
+
 	SetupBuffering(settings);
+
+	blog(LOG_INFO, "---------------------------------");
+	blog(LOG_INFO,
+	     "[MediaFoundation Device: '%s'] settings updated:\n"
+	     "\tvideo device: %s\n"
+	     "\tvideo path: %s\n"
+	     "\tresolution: %dx%d\n"
+	     "\tflip: %d\n"
+	     "\tfps: %0.2f (interval: %lld)\n"
+	     "\tbuffering: %s\n"
+	     "\thardware decode: %s",
+	     obs_source_get_name(source), (const char *)name_utf8, (const char *)path_utf8, videoConfig.cx,
+	     videoConfig.cyAbs, (int)videoConfig.cyFlip, fps, videoConfig.frameInterval,
+	     obs_source_async_unbuffered(source) ? "disabled" : "enabled", hw_decode ? "enabled" : "disabled");
 
 	return true;
 }
@@ -265,13 +355,14 @@ bool MediaFoundationSourceInput::UpdateVideoProperties(obs_data_t *settings)
 
 		for (size_t i = 0; i < count; i++) {
 			OBSDataAutoRelease item = obs_data_array_item(cca, i);
-			if (!item)
+			if (!item) {
 				continue;
+			}
 
 			MediaFoundationVideoDeviceProperty prop{};
-			prop.property = (long)obs_data_get_int(item, "property");
-			prop.flags = (long)obs_data_get_int(item, "flags");
-			prop.val = (long)obs_data_get_int(item, "val");
+			prop.property = static_cast<long>(obs_data_get_int(item, "property"));
+			prop.flags = static_cast<long>(obs_data_get_int(item, "flags"));
+			prop.val = static_cast<long>(obs_data_get_int(item, "val"));
 			properties.push_back(prop);
 		}
 	}
@@ -284,13 +375,14 @@ bool MediaFoundationSourceInput::UpdateVideoProperties(obs_data_t *settings)
 
 		for (size_t i = 0; i < count; i++) {
 			OBSDataAutoRelease item = obs_data_array_item(vpaa, i);
-			if (!item)
+			if (!item) {
 				continue;
+			}
 
 			MediaFoundationVideoDeviceProperty prop{};
-			prop.property = (long)obs_data_get_int(item, "property");
-			prop.flags = (long)obs_data_get_int(item, "flags");
-			prop.val = (long)obs_data_get_int(item, "val");
+			prop.property = static_cast<long>(obs_data_get_int(item, "property"));
+			prop.flags = static_cast<long>(obs_data_get_int(item, "flags"));
+			prop.val = static_cast<long>(obs_data_get_int(item, "val"));
 			properties.push_back(prop);
 		}
 	}
@@ -328,37 +420,43 @@ void MediaFoundationSourceInput::SetActive(bool active_)
 	obs_data_release(settings);
 }
 
-inline enum video_colorspace MediaFoundationSourceInput::GetColorSpace(obs_data_t *settings) const
+enum video_colorspace MediaFoundationSourceInput::GetColorSpace(obs_data_t *settings) const
 {
-	const char *space = obs_data_get_string(settings, COLOR_SPACE);
+	const char *space = obs_data_get_string(settings, MFCaptureConstants::COLOR_SPACE);
 
-	if (astrcmpi(space, "709") == 0)
+	if (astrcmpi(space, "709") == 0) {
 		return VIDEO_CS_709;
+	}
 
-	if (astrcmpi(space, "601") == 0)
+	if (astrcmpi(space, "601") == 0) {
 		return VIDEO_CS_601;
+	}
 
-	if (astrcmpi(space, "2100PQ") == 0)
+	if (astrcmpi(space, "2100PQ") == 0) {
 		return VIDEO_CS_2100_PQ;
+	}
 
-	if (astrcmpi(space, "2100HLG") == 0)
+	if (astrcmpi(space, "2100HLG") == 0) {
 		return VIDEO_CS_2100_HLG;
+	}
 
 	return VIDEO_CS_DEFAULT;
 }
 
-inline enum video_range_type MediaFoundationSourceInput::GetColorRange(obs_data_t *settings) const
+enum video_range_type MediaFoundationSourceInput::GetColorRange(obs_data_t *settings) const
 {
-	const char *range = obs_data_get_string(settings, COLOR_RANGE);
+	const char *range = obs_data_get_string(settings, MFCaptureConstants::COLOR_RANGE);
 
-	if (astrcmpi(range, "full") == 0)
+	if (astrcmpi(range, "full") == 0) {
 		return VIDEO_RANGE_FULL;
-	if (astrcmpi(range, "partial") == 0)
+	}
+	if (astrcmpi(range, "partial") == 0) {
 		return VIDEO_RANGE_PARTIAL;
+	}
 	return VIDEO_RANGE_DEFAULT;
 }
 
-inline bool MediaFoundationSourceInput::Activate(obs_data_t *settings)
+bool MediaFoundationSourceInput::Activate(obs_data_t *settings)
 {
 	if (mfcaptureDevice) {
 		MF_Stop(mfcaptureDevice);
@@ -399,16 +497,13 @@ inline bool MediaFoundationSourceInput::Activate(obs_data_t *settings)
 	bool success = video_format_get_parameters_for_format(cs, range, VIDEO_FORMAT_BGRA, frame.color_matrix,
 							      frame.color_range_min, frame.color_range_max);
 	if (!success) {
-		blog(LOG_ERROR,
-		     "Failed to get video format parameters for "
-		     "video format %u",
-		     cs);
+		blog(LOG_ERROR, "Failed to get video format parameters for video format %u", cs);
 	}
 
 	return true;
 }
 
-inline void MediaFoundationSourceInput::Deactivate()
+void MediaFoundationSourceInput::Deactivate()
 {
 	if (mfcaptureDevice) {
 		MF_Stop(mfcaptureDevice);

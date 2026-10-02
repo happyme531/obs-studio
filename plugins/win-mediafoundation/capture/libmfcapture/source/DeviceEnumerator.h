@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -50,12 +51,9 @@ SOFTWARE
 
 class DeviceEnumerator {
 
-	std::vector<MediaFoundationVideoDevice> _devices = {};
+	std::vector<MediaFoundationVideoDevice> devices_ = {};
 
 public:
-	DeviceEnumerator() {}
-	~DeviceEnumerator() {}
-
 	void static __stdcall EnumerateCameraCallback(const wchar_t *Name, const wchar_t *DevId, void *pUserData)
 	{
 		DeviceEnumerator *pThis = (DeviceEnumerator *)pUserData;
@@ -69,7 +67,7 @@ public:
 		if (h) {
 			HRESULT hr = MF_EnumerateStreamCapabilities(h, EnumerateStreamCapabilitiesCallback, &vd);
 			if (SUCCEEDED(hr)) {
-				pThis->_devices.push_back(vd);
+				pThis->devices_.push_back(vd);
 			}
 			MF_Destroy(h);
 		}
@@ -94,10 +92,10 @@ public:
 	HRESULT Enumerate(std::vector<MediaFoundationVideoDevice> &devices)
 	{
 		devices.clear();
-		_devices.clear();
+		devices_.clear();
 		HRESULT hr = MF_EnumerateCameras(EnumerateCameraCallback, this);
 		if (SUCCEEDED(hr)) {
-			devices = _devices;
+			devices = devices_;
 		}
 		return hr;
 	}

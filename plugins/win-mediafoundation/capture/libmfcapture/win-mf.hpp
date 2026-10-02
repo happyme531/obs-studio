@@ -1,6 +1,6 @@
 /*
 
-This is provided under a dual MIT/BSD/GPLv2 license.  When using or
+This is provided under a dual MIT/GPLv2+ license.  When using or
 redistributing this, you may do so under either license.
 
 GPL LICENSE SUMMARY
@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -43,38 +44,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE
 
-BSD LICENSE
-
-Copyright(c) 2025 Intel Corporation.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-* Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-
-* Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in
-the documentation and/or other materials provided with the
-distribution.
-
-* Neither the name of Intel Corporation nor the names of its
-contributors may be used to endorse or promote products derived
-from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 */
 
 #pragma once
@@ -107,21 +76,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma comment(lib, "mfplat.lib")
 #pragma comment(lib, "mfuuid.lib")
+#pragma comment(lib, "windowsapp.lib")
 
-namespace {
-constexpr const char *VIDEO_DEVICE_ID = "video_device_id";
-constexpr const char *RES_TYPE = "res_type";
-constexpr const char *RESOLUTION = "resolution";
-constexpr const char *FRAME_INTERVAL = "frame_interval";
-constexpr const char *LAST_VIDEO_DEV_ID = "last_video_device_id";
-constexpr const char *LAST_RESOLUTION = "last_resolution";
-constexpr const char *BUFFERING_VAL = "buffering";
-constexpr const char *FLIP_IMAGE = "flip_vertically";
-constexpr const char *COLOR_SPACE = "color_space";
-constexpr const char *COLOR_RANGE = "color_range";
-constexpr const char *DEACTIVATE_WNS = "deactivate_when_not_showing";
-constexpr const char *AUTOROTATION = "autorotation";
-} // namespace
+namespace MFCaptureConstants {
+inline constexpr const char *VIDEO_DEVICE_ID = "video_device_id";
+inline constexpr const char *RES_TYPE = "res_type";
+inline constexpr const char *RESOLUTION = "resolution";
+inline constexpr const char *FRAME_INTERVAL = "frame_interval";
+inline constexpr const char *LAST_VIDEO_DEV_ID = "last_video_device_id";
+inline constexpr const char *LAST_RESOLUTION = "last_resolution";
+inline constexpr const char *BUFFERING_VAL = "buffering";
+inline constexpr const char *FLIP_IMAGE = "flip_vertically";
+inline constexpr const char *COLOR_SPACE = "color_space";
+inline constexpr const char *COLOR_RANGE = "color_range";
+inline constexpr const char *DEACTIVATE_WNS = "deactivate_when_not_showing";
+inline constexpr const char *AUTOROTATION = "autorotation";
+inline constexpr const char *HW_DECODE = "hw_decode";
+} // namespace MFCaptureConstants
 
 enum BlurType {
 	NpuBlurType_None,
@@ -141,6 +112,11 @@ enum class BufferingType : int64_t {
 };
 
 enum class Action { None, Activate, ActivateBlock, Deactivate, Shutdown, SaveSettings, RestoreSettings, NpuControl };
+
+struct FrameSize {
+	int width;
+	int height;
+};
 
 struct MediaFoundationVideoInfo {
 	int minCX;
@@ -190,14 +166,14 @@ struct MediaFoundationVideoDeviceProperty {
 bool DecodeDeviceId(MediaFoundationDeviceId &out, const char *deviceId);
 void ProcessMessages();
 bool IsDecoupled(const MediaFoundationVideoConfig &config);
-bool ResolutionValid(const std::string &res, int &cx, int &cy);
+bool ResolutionValid(const std::string &res, FrameSize &size);
 long long GetOBSFPS();
-bool MatcherClosestFrameRateSelector(long long interval, long long &best_match, const MediaFoundationVideoInfo &info);
-bool ConvertRes(int &cx, int &cy, const char *res);
-bool ResolutionAvailable(const MediaFoundationVideoInfo &cap, int cx, int cy);
+bool MatcherClosestFrameRateSelector(long long interval, long long best_match, const MediaFoundationVideoInfo &info);
+bool ConvertRes(FrameSize &size, const char *res);
+bool ResolutionAvailable(const MediaFoundationVideoInfo &cap, FrameSize size);
 bool FrameRateAvailable(const MediaFoundationVideoInfo &cap, long long interval);
 
-static inline bool CapsMatch(const MediaFoundationVideoInfo &)
+static bool CapsMatch(const MediaFoundationVideoInfo &)
 {
 	return true;
 }
@@ -209,19 +185,21 @@ template<typename F, typename... Fs> static inline bool CapsMatch(const MediaFou
 	return f(info) && CapsMatch(info, fs...);
 }
 
-template<typename... F> static bool CapsMatch(const MediaFoundationVideoDevice &dev, F... fs)
+template<typename... F> bool CapsMatch(const MediaFoundationVideoDevice &dev, F... fs)
 {
-	// no early exit, trigger all side effects.
+	// No early exit, trigger all side effects.
 	bool match = false;
-	for (const MediaFoundationVideoInfo &info : dev.caps)
-		if (CapsMatch(info, fs...))
+	for (const MediaFoundationVideoInfo &info : dev.caps) {
+		if (CapsMatch(info, fs...)) {
 			match = true;
+		}
+	}
 	return match;
 }
 
-#define ResolutionMatcher(cx, cy)                                \
-	[cx, cy](const MediaFoundationVideoInfo &info) -> bool { \
-		return ResolutionAvailable(info, cx, cy);        \
+#define ResolutionMatcher(size)                                \
+	[size](const MediaFoundationVideoInfo &info) -> bool { \
+		return ResolutionAvailable(info, size);        \
 	}
 #define FrameRateMatcher(interval)                                 \
 	[interval](const MediaFoundationVideoInfo &info) -> bool { \

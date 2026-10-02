@@ -11,7 +11,7 @@ BEGIN
       VALUE "ProductName", "${OBS_PRODUCT_NAME}"
       VALUE "ProductVersion", "${OBS_VERSION_CANONICAL}"
       VALUE "Comments", "${OBS_COMMENTS}"
-      VALUE "LegalCopyright", "Copyright (C) 2023, Intel Corporation"
+      VALUE "LegalCopyright", "Copyright (C) 2026, Intel Corporation"
       VALUE "InternalName", "win-mediafoundation-capture"
       VALUE "OriginalFilename", "win-mediafoundation-capture"
     END

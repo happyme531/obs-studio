@@ -1,6 +1,6 @@
 /*
 
-This is provided under a dual MIT/GPLv2 license.  When using or
+This is provided under a dual MIT/GPLv2+ license.  When using or
 redistributing this, you may do so under either license.
 
 GPL LICENSE SUMMARY
@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -75,41 +76,41 @@ MFCAPTURE_EXPORTS HRESULT MF_EnumerateCameras(MF_EnumerateCameraCallback cb, voi
 
 MFCAPTURE_EXPORTS CAPTURE_DEVICE_HANDLE MF_Create(const wchar_t *DevId);
 
-MFCAPTURE_EXPORTS void MF_Destroy(CAPTURE_DEVICE_HANDLE h);
+MFCAPTURE_EXPORTS void MF_Destroy(CAPTURE_DEVICE_HANDLE deviceHandle);
 
-MFCAPTURE_EXPORTS HRESULT MF_Prepare(CAPTURE_DEVICE_HANDLE h);
+MFCAPTURE_EXPORTS HRESULT MF_Prepare(CAPTURE_DEVICE_HANDLE deviceHandle);
 
-MFCAPTURE_EXPORTS HRESULT MF_EnumerateStreamCapabilities(CAPTURE_DEVICE_HANDLE h,
+MFCAPTURE_EXPORTS HRESULT MF_EnumerateStreamCapabilities(CAPTURE_DEVICE_HANDLE deviceHandle,
 							 MF_EnumerateStreamCapabilitiesCallback cb, void *pUserData);
 
 // If llInterval is 0, set the camera to use the max FPS.
 // Otherwise, set camera with matching FPS.
-MFCAPTURE_EXPORTS HRESULT MF_SetOutputResolution(CAPTURE_DEVICE_HANDLE h, UINT32 uiWidth, UINT32 uiHeight,
+MFCAPTURE_EXPORTS HRESULT MF_SetOutputResolution(CAPTURE_DEVICE_HANDLE deviceHandle, UINT32 uiWidth, UINT32 uiHeight,
 						 LONGLONG llInterval, MF_COLOR_FORMAT fmt);
 
 // LONGLONG llInterval = 10000000ll * uiFpsD / uiFpsN;
-MFCAPTURE_EXPORTS HRESULT MF_GetOutputResolution(CAPTURE_DEVICE_HANDLE h, UINT32 *uiWidth, UINT32 *uiHeight,
+MFCAPTURE_EXPORTS HRESULT MF_GetOutputResolution(CAPTURE_DEVICE_HANDLE deviceHandle, UINT32 *uiWidth, UINT32 *uiHeight,
 						 UINT32 *uiFpsN, UINT32 *uiFpsD);
 
-MFCAPTURE_EXPORTS HRESULT MF_Start(CAPTURE_DEVICE_HANDLE h, MF_VideoDataCallback cb, void *pUserData);
+MFCAPTURE_EXPORTS HRESULT MF_Start(CAPTURE_DEVICE_HANDLE deviceHandle, MF_VideoDataCallback cb, void *pUserData);
 
-MFCAPTURE_EXPORTS HRESULT MF_Stop(CAPTURE_DEVICE_HANDLE h);
+MFCAPTURE_EXPORTS HRESULT MF_Stop(CAPTURE_DEVICE_HANDLE deviceHandle);
 
-MFCAPTURE_EXPORTS HRESULT MF_GetBlur(CAPTURE_DEVICE_HANDLE h, bool &blur, bool &shallowFocus, bool &mask);
+MFCAPTURE_EXPORTS HRESULT MF_GetBlur(CAPTURE_DEVICE_HANDLE deviceHandle, bool blur, bool shallowFocus, bool mask);
 
-MFCAPTURE_EXPORTS HRESULT MF_SetBlur(CAPTURE_DEVICE_HANDLE h, BOOL blur, BOOL shallowFocus, BOOL mask);
+MFCAPTURE_EXPORTS HRESULT MF_SetBlur(CAPTURE_DEVICE_HANDLE deviceHandle, BOOL blur, BOOL shallowFocus, BOOL mask);
 
-MFCAPTURE_EXPORTS HRESULT MF_GetTransparent(CAPTURE_DEVICE_HANDLE h, bool &enable);
+MFCAPTURE_EXPORTS HRESULT MF_GetTransparent(CAPTURE_DEVICE_HANDLE deviceHandle, bool enable);
 
-MFCAPTURE_EXPORTS HRESULT MF_GetAutoFraming(CAPTURE_DEVICE_HANDLE h, bool &enable);
+MFCAPTURE_EXPORTS HRESULT MF_GetAutoFraming(CAPTURE_DEVICE_HANDLE deviceHandle, bool enable);
 
-MFCAPTURE_EXPORTS HRESULT MF_SetAutoFraming(CAPTURE_DEVICE_HANDLE h, BOOL enable);
+MFCAPTURE_EXPORTS HRESULT MF_SetAutoFraming(CAPTURE_DEVICE_HANDLE deviceHandle, BOOL enable);
 
-MFCAPTURE_EXPORTS HRESULT MF_GetEyeGazeCorrection(CAPTURE_DEVICE_HANDLE h, bool &enable);
+MFCAPTURE_EXPORTS HRESULT MF_GetEyeGazeCorrection(CAPTURE_DEVICE_HANDLE deviceHandle, bool enable);
 
-MFCAPTURE_EXPORTS HRESULT MF_SetEyeGazeCorrection(CAPTURE_DEVICE_HANDLE h, BOOL enable);
+MFCAPTURE_EXPORTS HRESULT MF_SetEyeGazeCorrection(CAPTURE_DEVICE_HANDLE deviceHandle, BOOL enable);
 
-MFCAPTURE_EXPORTS HRESULT MF_RestoreDefaultSettings(CAPTURE_DEVICE_HANDLE h);
+MFCAPTURE_EXPORTS HRESULT MF_RestoreDefaultSettings(CAPTURE_DEVICE_HANDLE deviceHandle);
 
 #ifdef __cplusplus
 }

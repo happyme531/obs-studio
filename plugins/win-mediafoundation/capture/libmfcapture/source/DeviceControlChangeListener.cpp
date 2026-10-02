@@ -1,6 +1,6 @@
 /*
 
-This is provided under a dual MIT/GPLv2 license.  When using or
+This is provided under a dual MIT/GPLv2+ license.  When using or
 redistributing this, you may do so under either license.
 
 GPL LICENSE SUMMARY
@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -45,10 +46,6 @@ SOFTWARE
 */
 
 #include "DeviceControlChangeListener.hpp"
-
-DeviceControlChangeListener::DeviceControlChangeListener() {}
-
-DeviceControlChangeListener::~DeviceControlChangeListener() {}
 
 // IUnknown methods
 HRESULT __stdcall DeviceControlChangeListener::QueryInterface(REFIID iid, void **ppv)
@@ -100,11 +97,8 @@ DeviceControlChangeListener::HandleControlSet_ExtendedCameraControl(UINT32 id)
 	WS_CONTROL_VALUE ctrlValue = WS_EFFECT_OFF;
 
 	if (id == KSPROPERTY_CAMERACONTROL_EXTENDED_EYEGAZECORRECTION) {
-
 		bool effect = Flags & KSCAMERA_EXTENDEDPROP_EYEGAZECORRECTION_ON;
-
 	} else if (id == KSPROPERTY_CAMERACONTROL_EXTENDED_BACKGROUNDSEGMENTATION) {
-
 		bool blur = Flags & KSCAMERA_EXTENDEDPROP_BACKGROUNDSEGMENTATION_BLUR;
 		bool focus = Flags & KSCAMERA_EXTENDEDPROP_BACKGROUNDSEGMENTATION_SHALLOWFOCUS;
 		bool mask = Flags & KSCAMERA_EXTENDEDPROP_BACKGROUNDSEGMENTATION_MASK;
@@ -112,9 +106,7 @@ DeviceControlChangeListener::HandleControlSet_ExtendedCameraControl(UINT32 id)
 		if (focus) {
 			blur = false;
 		}
-
 	} else if (id == KSPROPERTY_CAMERACONTROL_EXTENDED_DIGITALWINDOW) {
-
 		bool effect = Flags & KSCAMERA_EXTENDEDPROP_DIGITALWINDOW_AUTOFACEFRAMING;
 	}
 
@@ -142,7 +134,6 @@ void STDMETHODCALLTYPE DeviceControlChangeListener::OnChange(_In_ REFGUID contro
 		printf("PROPSETID_VIDCAP_VIDEOPROCAMP\n");
 	} else if (IsEqualCLSID(controlSet, PROPSETID_VIDCAP_CAMERACONTROL)) {
 		printf("PROPSETID_VIDCAP_CAMERACONTROL\n");
-
 	} else if (IsEqualCLSID(controlSet, KSPROPERTYSETID_ExtendedCameraControl)) {
 		printf("KSPROPERTYSETID_ExtendedCameraControl\n");
 		HandleControlSet_ExtendedCameraControl(id);

@@ -1,6 +1,6 @@
 /*
 
-This is provided under a dual MIT/GPLv2 license.  When using or
+This is provided under a dual MIT/GPLv2+ license.  When using or
 redistributing this, you may do so under either license.
 
 GPL LICENSE SUMMARY
@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -56,6 +57,10 @@ SOFTWARE
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "mfsensorgroup.lib")
 
+namespace {
+constexpr double MF_TIME_UNITS_PER_SECOND = 10000000.0;
+}
+
 extern void ControlNotification(WS_CONTROL_TYPE type, WS_CONTROL_VALUE value, void *pUserData);
 
 PhysicalCamera::~PhysicalCamera()
@@ -67,7 +72,6 @@ PhysicalCamera::~PhysicalCamera()
 
 HRESULT __stdcall PhysicalCamera::QueryInterface(REFIID iid, void **ppv)
 {
-
 	if (iid == IID_IUnknown) {
 		*ppv = static_cast<IUnknown *>(this);
 	} else if (iid == IID_IMFSourceReaderCallback) {
@@ -87,7 +91,6 @@ ULONG __stdcall PhysicalCamera::AddRef()
 
 ULONG __stdcall PhysicalCamera::Release()
 {
-
 	if (InterlockedDecrement(&m_cRef) == 0) {
 		delete this;
 		return 0;
@@ -173,7 +176,6 @@ HRESULT PhysicalCamera::Initialize(LPCWSTR pwszSymLink)
 
 HRESULT PhysicalCamera::Uninitialize()
 {
-
 	printf("%s, Begin\n", __FUNCSIG__);
 
 	Stop();
@@ -259,7 +261,6 @@ HRESULT PhysicalCamera::Start(DWORD dwPhyStrmIndex, MF_VideoDataCallback cb, voi
 
 HRESULT PhysicalCamera::Stop()
 {
-
 	printf("%s, Begin\n", __FUNCSIG__);
 	HRESULT hr = S_OK;
 
@@ -327,10 +328,10 @@ void resizeBilinearAlpha(BYTE *mask, int w, int h, DWORD *dest, int w2, int h2)
 			D = mask[index + w + 1] & 0xff;
 
 			// Y = A(1-w)(1-h) + B(w)(1-h) + C(h)(1-w) + Dwh
-			gray = (int)(A * (1 - x_diff) * (1 - y_diff) + B * (x_diff) * (1 - y_diff) +
-				     C * (y_diff) * (1 - x_diff) + D * (x_diff * y_diff));
+			gray = static_cast<int>(A * (1 - x_diff) * (1 - y_diff) + B * (x_diff) * (1 - y_diff) +
+						C * (y_diff) * (1 - x_diff) + D * (x_diff * y_diff));
 
-			BYTE *destbyte = (BYTE *)&dest[offset];
+			BYTE *destbyte = reinterpret_cast<BYTE *>(&dest[offset]);
 			destbyte[3] = gray;
 			offset++;
 		}
@@ -339,7 +340,6 @@ void resizeBilinearAlpha(BYTE *mask, int w, int h, DWORD *dest, int w2, int h2)
 
 HRESULT PhysicalCamera::FillSegMask(IMFSample *pSample)
 {
-
 	if (!pSample) {
 		return E_POINTER;
 	}
@@ -519,17 +519,23 @@ HRESULT FindMatchingMediaType(IMFMediaType *pType, IMFMediaTypeHandler *pPhyHand
 	DWORD cTypes = 0;
 	RETURN_IF_FAILED(pPhyHandler->GetMediaTypeCount(&cTypes));
 
-	UINT32 _cx = 0, _cy = 0, _fpsN = 0, _fpsD = 0;
-	RETURN_IF_FAILED(MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, &_cx, &_cy));
-	RETURN_IF_FAILED(MFGetAttributeRatio(pType, MF_MT_FRAME_RATE, &_fpsN, &_fpsD));
+	FrameRate requestedFrameRate = {0};
+	FrameSize requestedFrameSize = {0};
+
+	RETURN_IF_FAILED(
+		MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, &requestedFrameSize.width, &requestedFrameSize.height));
+	RETURN_IF_FAILED(MFGetAttributeRatio(pType, MF_MT_FRAME_RATE, &requestedFrameRate.numerator,
+					     &requestedFrameRate.denominator));
 
 	bool found = false;
-	UINT32 cx = 0, cy = 0, xc = 0, yc = 0, fpsN = 0, fpsD = 0;
+	FrameRate frameRate = {0};
+	FrameSize frameSize = {0};
+	FrameSize matchingSize = {0};
 
 	GUID majorType, subType;
 	wil::com_ptr_nothrow<IMFMediaType> spMatchingPhyType;
 
-	long _area = _cx * _cy;
+	long _area = requestedFrameSize.width * requestedFrameSize.height;
 	long _delta = LONG_MAX;
 	wil::com_ptr_nothrow<IMFMediaType> spPhyType;
 	for (DWORD i = 0; i < cTypes; i++) {
@@ -547,30 +553,33 @@ HRESULT FindMatchingMediaType(IMFMediaType *pType, IMFMediaTypeHandler *pPhyHand
 			continue;
 		}
 
-		RETURN_IF_FAILED(MFGetAttributeRatio(spPhyType.get(), MF_MT_FRAME_RATE, &fpsN, &fpsD));
+		RETURN_IF_FAILED(MFGetAttributeRatio(spPhyType.get(), MF_MT_FRAME_RATE, &frameRate.numerator,
+						     &frameRate.denominator));
 
-		if (fpsN != _fpsN && fpsD != _fpsD) {
+		if (frameRate.numerator != requestedFrameRate.numerator &&
+		    frameRate.denominator != requestedFrameRate.denominator) {
 			spPhyType.reset();
 			continue;
 		}
 
-		RETURN_IF_FAILED(MFGetAttributeSize(spPhyType.get(), MF_MT_FRAME_SIZE, &cx, &cy));
+		RETURN_IF_FAILED(
+			MFGetAttributeSize(spPhyType.get(), MF_MT_FRAME_SIZE, &frameSize.width, &frameSize.height));
 
-		double aspect_ratio = (double)cx / (double)cy;
-		double _aspect_ratio = (double)_cx / (double)_cy;
+		double aspect_ratio = (double)frameSize.width / (double)frameSize.height;
+		double _aspect_ratio = (double)requestedFrameSize.width / (double)requestedFrameSize.height;
 		if (bMatchAspectRatio && fabs(aspect_ratio - _aspect_ratio) > 0.1) {
 			spPhyType.reset();
 			continue;
 		}
 
-		long area = cx * cy;
+		long area = frameSize.width * frameSize.height;
 		long delta = abs(_area - area);
 		if (delta < _delta) {
 			_delta = delta;
 			spMatchingPhyType = nullptr;
 			spMatchingPhyType = spPhyType;
-			xc = cx;
-			yc = cy;
+			matchingSize.width = frameSize.width;
+			matchingSize.height = frameSize.height;
 		}
 
 		spPhyType.reset();
@@ -580,7 +589,9 @@ HRESULT FindMatchingMediaType(IMFMediaType *pType, IMFMediaTypeHandler *pPhyHand
 		return E_UNEXPECTED;
 	}
 
-	printf("%d x %d : %d x %d - %d / %d : %d / %d", xc, yc, _cx, _cy, fpsN, fpsD, _fpsN, _fpsD);
+	printf("%d x %d : %d x %d - %d / %d : %d / %d", matchingSize.width, matchingSize.height,
+	       requestedFrameSize.width, requestedFrameSize.height, frameRate.numerator, frameRate.denominator,
+	       requestedFrameRate.numerator, requestedFrameRate.denominator);
 
 	wil::com_ptr_nothrow<IMFMediaType> spMatchingPhyTypeClone;
 	RETURN_IF_FAILED(MFCreateMediaType(&spMatchingPhyTypeClone));
@@ -655,8 +666,10 @@ HRESULT PhysicalCamera::FindMatchingNativeMediaType(DWORD dwPhyStrmIndex, UINT32
 	wil::com_ptr_nothrow<IMFMediaType> spMatchingPhyType = nullptr;
 	wil::com_ptr_nothrow<IMFMediaType> spPhyType = nullptr;
 
-	double _maxfps = -1.0;
-	UINT32 fpsN = 0, fpsD = 0, cx = 0, cy = 0;
+	double maxFramesPerSecond = -1.0;
+	FrameRate frameRate = {0};
+	FrameSize frameSize = {0};
+
 	for (DWORD i = 0; i < cTypes; i++) {
 		RETURN_IF_FAILED(spPhyHandler->GetMediaTypeByIndex(i, &spPhyType));
 		RETURN_IF_FAILED(spPhyType->GetGUID(MF_MT_MAJOR_TYPE, &majorType));
@@ -665,21 +678,25 @@ HRESULT PhysicalCamera::FindMatchingNativeMediaType(DWORD dwPhyStrmIndex, UINT32
 			return E_UNEXPECTED;
 		}
 
-		RETURN_IF_FAILED(MFGetAttributeRatio(spPhyType.get(), MF_MT_FRAME_RATE, &fpsN, &fpsD));
-		RETURN_IF_FAILED(MFGetAttributeSize(spPhyType.get(), MF_MT_FRAME_SIZE, &cx, &cy));
+		RETURN_IF_FAILED(MFGetAttributeRatio(spPhyType.get(), MF_MT_FRAME_RATE, &frameRate.numerator,
+						     &frameRate.denominator));
+		RETURN_IF_FAILED(
+			MFGetAttributeSize(spPhyType.get(), MF_MT_FRAME_SIZE, &frameSize.width, &frameSize.height));
 
-		if (cx == uiWidth && cy == uiHeight) {
+		if (frameSize.width == uiWidth && frameSize.height == uiHeight) {
 			if (llInterval == 0) {
-				double _fps = (double)fpsN / (double)fpsD;
-				if (_fps > _maxfps) {
+				double frameRateValue = static_cast<double>(frameRate.numerator) /
+							static_cast<double>(frameRate.denominator);
+				if (frameRateValue > maxFramesPerSecond) {
 					spMatchingPhyType = nullptr;
 					spMatchingPhyType = spPhyType;
-					_maxfps = _fps;
+					maxFramesPerSecond = frameRateValue;
 				}
 			} else {
-				double _fps = (double)fpsN / (double)fpsD;
-				double fps = (double)10000000.0 / (double)llInterval;
-				if (fabs(fps - _fps) < 0.1) {
+				double frameRateValue = static_cast<double>(frameRate.numerator) /
+							static_cast<double>(frameRate.denominator);
+				double fps = MF_TIME_UNITS_PER_SECOND / (double)llInterval;
+				if (fabs(fps - frameRateValue) < 0.1) {
 					spMatchingPhyType = nullptr;
 					spMatchingPhyType = spPhyType;
 					break;
@@ -737,16 +754,20 @@ PhysicalCamera::GetStreamCapabilities(DWORD dwPhyStrmIndex, std::vector<StreamIn
 
 		RETURN_IF_FAILED(spPhyType->GetGUID(MF_MT_SUBTYPE, &subType));
 
-		UINT32 _cx, _cy, _fpsN, _fpsD;
-		RETURN_IF_FAILED(MFGetAttributeSize(spPhyType.get(), MF_MT_FRAME_SIZE, &_cx, &_cy));
-		RETURN_IF_FAILED(MFGetAttributeRatio(spPhyType.get(), MF_MT_FRAME_RATE, &_fpsN, &_fpsD));
+		FrameRate frameRate = {0};
+		FrameSize frameSize = {0};
+
+		RETURN_IF_FAILED(
+			MFGetAttributeSize(spPhyType.get(), MF_MT_FRAME_SIZE, &frameSize.width, &frameSize.height));
+		RETURN_IF_FAILED(MFGetAttributeRatio(spPhyType.get(), MF_MT_FRAME_RATE, &frameRate.numerator,
+						     &frameRate.denominator));
 
 		StreamInformation cap;
 		cap.guidSubtype = subType;
-		cap.uiWidth = _cx;
-		cap.uiHeight = _cy;
-		cap.uiFpsN = _fpsN;
-		cap.uiFpsD = _fpsD;
+		cap.uiWidth = frameSize.width;
+		cap.uiHeight = frameSize.height;
+		cap.uiFpsN = frameRate.numerator;
+		cap.uiFpsD = frameRate.denominator;
 		strmCaps.push_back(cap);
 
 		spPhyType.reset();
@@ -798,13 +819,14 @@ HRESULT CreateMediaTypeFrom(IMFMediaType *pType, MF_COLOR_FORMAT fmt, IMFMediaTy
 HRESULT GetDefaultStride(IMFMediaType *pType, LONG *plStride)
 {
 	LONG lStride = 0;
-	HRESULT hr = pType->GetUINT32(MF_MT_DEFAULT_STRIDE, (UINT32 *)&lStride);
+	HRESULT hr = pType->GetUINT32(MF_MT_DEFAULT_STRIDE, reinterpret_cast<UINT32 *>(&lStride));
 	if (FAILED(hr)) {
-		UINT32 cx = 0, cy = 0;
+		FrameSize frameSize = {0};
 		GUID subType = GUID_NULL;
+
 		RETURN_IF_FAILED(pType->GetGUID(MF_MT_SUBTYPE, &subType));
-		RETURN_IF_FAILED(MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, &cx, &cy));
-		RETURN_IF_FAILED(MFGetStrideForBitmapInfoHeader(subType.Data1, cx, &lStride));
+		RETURN_IF_FAILED(MFGetAttributeSize(pType, MF_MT_FRAME_SIZE, &frameSize.width, &frameSize.height));
+		RETURN_IF_FAILED(MFGetStrideForBitmapInfoHeader(subType.Data1, frameSize.width, &lStride));
 	}
 	*plStride = lStride;
 	return S_OK;
@@ -866,15 +888,18 @@ HRESULT PhysicalCamera::GetCurrentStreamInformation(DWORD dwPhyStrmIndex, Stream
 
 	RETURN_IF_FAILED(spType->GetGUID(MF_MT_SUBTYPE, &subType));
 
-	UINT32 _cx, _cy, _fpsN, _fpsD;
-	RETURN_IF_FAILED(MFGetAttributeSize(spType.get(), MF_MT_FRAME_SIZE, &_cx, &_cy));
-	RETURN_IF_FAILED(MFGetAttributeRatio(spType.get(), MF_MT_FRAME_RATE, &_fpsN, &_fpsD));
+	FrameRate frameRate = {0};
+	FrameSize frameSize = {0};
+
+	RETURN_IF_FAILED(MFGetAttributeSize(spType.get(), MF_MT_FRAME_SIZE, &frameSize.width, &frameSize.height));
+	RETURN_IF_FAILED(
+		MFGetAttributeRatio(spType.get(), MF_MT_FRAME_RATE, &frameRate.numerator, &frameRate.denominator));
 
 	strmInfo.guidSubtype = subType;
-	strmInfo.uiWidth = _cx;
-	strmInfo.uiHeight = _cy;
-	strmInfo.uiFpsN = _fpsN;
-	strmInfo.uiFpsD = _fpsD;
+	strmInfo.uiWidth = frameSize.width;
+	strmInfo.uiHeight = frameSize.height;
+	strmInfo.uiFpsN = frameRate.numerator;
+	strmInfo.uiFpsD = frameRate.denominator;
 
 	printf("%s, End\n", __FUNCSIG__);
 	return S_OK;
@@ -882,7 +907,6 @@ HRESULT PhysicalCamera::GetCurrentStreamInformation(DWORD dwPhyStrmIndex, Stream
 
 HRESULT PhysicalCamera::SetBlur(bool blur, bool shallowFocus, bool mask)
 {
-
 	printf("%s, %d, Begin\n", __FUNCSIG__, __LINE__);
 	winrt::slim_lock_guard lock(m_Lock);
 
@@ -1118,11 +1142,11 @@ HRESULT PhysicalCamera::GetEyeGazeCorrection(bool &enable)
 std::vector<MepSetting> PhysicalCamera::s_MepSettings;
 HRESULT PhysicalCamera::GetMepSetting(MepSetting &setting)
 {
-
 	bool blur, shallowfocus, mask, autoframing, eyegaze;
 
-	if (m_spExtController == nullptr)
+	if (m_spExtController == nullptr) {
 		return S_OK;
+	}
 
 	RETURN_IF_FAILED(GetBlur(blur, shallowfocus, mask));
 	setting.Blur = blur;
@@ -1140,7 +1164,6 @@ HRESULT PhysicalCamera::GetMepSetting(MepSetting &setting)
 
 HRESULT PhysicalCamera::SetMepSetting(MepSetting &setting)
 {
-
 	RETURN_IF_FAILED(SetBlur(setting.Blur, setting.ShallowFocus, setting.Mask));
 	RETURN_IF_FAILED(SetAutoFraming(setting.AutoFraming));
 	RETURN_IF_FAILED(SetEyeGazeCorrection(setting.EyeGazeCorrection));
@@ -1169,7 +1192,6 @@ HRESULT PhysicalCamera::SaveSettingsToDefault()
 
 HRESULT PhysicalCamera::RestoreDefaultSettings()
 {
-
 	for (auto &setting : s_MepSettings) {
 		if (setting.SymbolicLink == m_wsSymbolicName) {
 			RETURN_IF_FAILED(SetMepSetting(setting));

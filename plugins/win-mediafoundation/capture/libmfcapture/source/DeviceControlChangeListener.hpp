@@ -1,6 +1,6 @@
 /*
 
-This is provided under a dual MIT/GPLv2 license.  When using or
+This is provided under a dual MIT/GPLv2+ license.  When using or
 redistributing this, you may do so under either license.
 
 GPL LICENSE SUMMARY
@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -86,9 +87,6 @@ private:
 	HRESULT HandleControlSet_ExtendedCameraControl(UINT32 id);
 
 public:
-	DeviceControlChangeListener();
-	~DeviceControlChangeListener();
-
 	// IUnknown methods
 	IFACEMETHODIMP_(ULONG) AddRef(void) override;
 	IFACEMETHODIMP_(ULONG) Release(void) override;

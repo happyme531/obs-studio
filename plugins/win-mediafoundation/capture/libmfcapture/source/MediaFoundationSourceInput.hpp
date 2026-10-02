@@ -1,6 +1,6 @@
 /*
 
-This is provided under a dual MIT/GPLv2 license.  When using or
+This is provided under a dual MIT/GPLv2+ license.  When using or
 redistributing this, you may do so under either license.
 
 GPL LICENSE SUMMARY
@@ -8,8 +8,9 @@ GPL LICENSE SUMMARY
 Copyright(c) 2025 Intel Corporation.
 
 This program is free software; you can redistribute it and/or modify
-it under the terms of version 2 of the GNU General Public License as
-published by the Free Software Foundation.
+it under the terms the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version.
 
 This program is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -46,6 +47,9 @@ SOFTWARE
 
 #pragma once
 
+#include "mfcapture.hpp"
+#include "win-mf.hpp"
+
 #include <obs-module.h>
 #include <obs.hpp>
 #include <util/dstr.hpp>
@@ -63,15 +67,13 @@ SOFTWARE
 #include <dxcore.h>
 #include <mfapi.h>
 #include <objbase.h>
-#include <winrt/base.h>
 #include <initguid.h>
+#include <winrt/base.h>
 
-#include "mfcapture.hpp"
-#include "win-mf.hpp"
+DWORD CALLBACK MediaFoundationSourceThread(LPVOID ptr);
 
-extern DWORD CALLBACK MediaFoundationSourceThread(LPVOID ptr);
-
-struct MediaFoundationSourceInput {
+class MediaFoundationSourceInput {
+public:
 	obs_source_t *source;
 	CAPTURE_DEVICE_HANDLE mfcaptureDevice = nullptr;
 	HRESULT mfcapturedialog = E_FAIL;
@@ -81,6 +83,7 @@ struct MediaFoundationSourceInput {
 	bool active = false;
 	bool autorotation = true;
 	bool firstframe = true;
+	bool hw_decode = true;
 
 	MediaFoundationVideoConfig videoConfig;
 
@@ -93,14 +96,14 @@ struct MediaFoundationSourceInput {
 	CriticalSection mutex;
 	std::vector<Action> actions;
 
-	inline void QueueAction(Action action)
+	void QueueAction(Action action)
 	{
 		CriticalScope scope(mutex);
 		actions.push_back(action);
 		ReleaseSemaphore(semaphore, 1, nullptr);
 	}
 
-	inline void QueueActivate(obs_data_t *settings)
+	void QueueActivate(obs_data_t *settings)
 	{
 		bool block = obs_data_get_bool(settings, "synchronous_activate");
 		QueueAction(block ? Action::ActivateBlock : Action::Activate);
@@ -110,38 +113,9 @@ struct MediaFoundationSourceInput {
 		}
 	}
 
-	inline MediaFoundationSourceInput(obs_source_t *source_, obs_data_t *settings) : source(source_)
-	{
-		memset(&frame, 0, sizeof(frame));
+	MediaFoundationSourceInput(obs_source_t *source_, obs_data_t *settings);
 
-		semaphore = CreateSemaphore(nullptr, 0, 0x7FFFFFFF, nullptr);
-		if (!semaphore)
-			throw "Failed to create semaphore";
-
-		activated_event = CreateEvent(nullptr, false, false, nullptr);
-		if (!activated_event)
-			throw "Failed to create activated_event";
-
-		saved_event = CreateEvent(nullptr, false, false, nullptr);
-		if (!saved_event)
-			throw "Failed to create saved_event";
-
-		thread = CreateThread(nullptr, 0, MediaFoundationSourceThread, this, 0, nullptr);
-		if (!thread)
-			throw "Failed to create thread";
-
-		deactivateWhenNotShowing = obs_data_get_bool(settings, DEACTIVATE_WNS);
-
-		if (obs_data_get_bool(settings, "active")) {
-			bool showing = obs_source_showing(source);
-			if (!deactivateWhenNotShowing || showing)
-				QueueActivate(settings);
-
-			active = true;
-		}
-	}
-
-	inline ~MediaFoundationSourceInput()
+	~MediaFoundationSourceInput()
 	{
 		{
 			CriticalScope scope(mutex);
@@ -159,12 +133,12 @@ struct MediaFoundationSourceInput {
 	bool UpdateVideoProperties(obs_data_t *settings);
 	void SaveVideoProperties();
 	void SetActive(bool active);
-	inline enum video_colorspace GetColorSpace(obs_data_t *settings) const;
-	inline enum video_range_type GetColorRange(obs_data_t *settings) const;
-	inline bool Activate(obs_data_t *settings);
-	inline void Deactivate();
+	enum video_colorspace GetColorSpace(obs_data_t *settings) const;
+	enum video_range_type GetColorRange(obs_data_t *settings) const;
+	bool Activate(obs_data_t *settings);
+	void Deactivate();
 
-	inline void SetupBuffering(obs_data_t *settings);
+	void SetupBuffering(obs_data_t *settings);
 
 	void MediaFoundationSourceLoop();
 
@@ -172,7 +146,8 @@ struct MediaFoundationSourceInput {
 	void OnVideoData(void *pData, int Size, long long llTimestamp);
 };
 
-struct PropertiesData {
+class PropertiesData {
+public:
 	MediaFoundationSourceInput *input;
 	std::vector<MediaFoundationVideoDevice> devices;
 
