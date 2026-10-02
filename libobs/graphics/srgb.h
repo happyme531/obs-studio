@@ -90,17 +90,16 @@ static inline void gs_float3_srgb_linear_to_nonlinear(float *f)
 
 static inline void gs_premultiply_xyza(uint8_t *data)
 {
-// This can get vectorized with both NEON and AVX2. The early return prevents
-// the vectorization in both cases.
-#if !(defined(__ARM_NEON) || defined(__AVX2__))
+	// Keep the pixel loop branch-free on NEON and AVX2 targets.
+#if !(defined(__ARM_NEON) || defined(_M_ARM64) || defined(__AVX2__))
 	if (data[3] == 0xFF)
 		return;
 #endif
 
 	uint16_t a = data[3];
-	data[0] = (data[0] * a + 127) / 255;
-	data[1] = (data[1] * a + 127) / 255;
-	data[2] = (data[2] * a + 127) / 255;
+	data[0] = (uint8_t)((data[0] * a + 127) / 255);
+	data[1] = (uint8_t)((data[1] * a + 127) / 255);
+	data[2] = (uint8_t)((data[2] * a + 127) / 255);
 }
 
 static inline void gs_premultiply_xyza_srgb(uint8_t *data)
@@ -121,9 +120,8 @@ static inline void gs_premultiply_xyza_srgb(uint8_t *data)
 
 static inline void gs_premultiply_xyza_restrict(uint8_t *__restrict dst, const uint8_t *__restrict src)
 {
-// This can get vectorized with both NEON and AVX2. The early return prevents
-// the vectorization in both cases.
-#if !(defined(__ARM_NEON) || defined(__AVX2__))
+	// Keep the pixel loop branch-free on NEON and AVX2 targets.
+#if !(defined(__ARM_NEON) || defined(_M_ARM64) || defined(__AVX2__))
 	if (src[3] == 0xFF) {
 		memcpy(dst, src, sizeof(uint8_t[4]));
 		return;
@@ -131,9 +129,10 @@ static inline void gs_premultiply_xyza_restrict(uint8_t *__restrict dst, const u
 #endif
 
 	uint16_t a = src[3];
-	dst[0] = (src[0] * a + 127) / 255;
-	dst[1] = (src[1] * a + 127) / 255;
-	dst[2] = (src[2] * a + 127) / 255;
+	dst[0] = (uint8_t)((src[0] * a + 127) / 255);
+	dst[1] = (uint8_t)((src[1] * a + 127) / 255);
+	dst[2] = (uint8_t)((src[2] * a + 127) / 255);
+	dst[3] = src[3];
 }
 
 static inline void gs_premultiply_xyza_srgb_restrict(uint8_t *__restrict dst, const uint8_t *__restrict src)
